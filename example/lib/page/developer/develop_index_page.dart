@@ -346,13 +346,13 @@ class _DeveloperIndexPageState extends State<DeveloperIndexPage> {
     File? imgFile;
     File? videoFile;
     try {
-      imgFile = await _copyAssetToTempFile('assets/IMG_0189.HEIC');
+      imgFile = await _copyAssetToTempFile('assets/IMG_0189.heic');
       print('[LivePhoto] Image copied to ${imgFile.path}');
       print('[LivePhoto]   exists: ${imgFile.existsSync()}');
       print('[LivePhoto]   length: ${imgFile.lengthSync()}');
       print('[LivePhoto]   absolute: ${imgFile.absolute.path}');
 
-      videoFile = await _copyAssetToTempFile('assets/IMG_0189.MOV');
+      videoFile = await _copyAssetToTempFile('assets/IMG_0189.mov');
       print('[LivePhoto] Video copied to ${videoFile.path}');
       print('[LivePhoto]   exists: ${videoFile.existsSync()}');
       print('[LivePhoto]   length: ${videoFile.lengthSync()}');
