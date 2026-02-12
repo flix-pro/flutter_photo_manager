@@ -1438,33 +1438,65 @@
                 title:(NSString *)title
                  desc:(NSString *)desc
                 block:(AssetBlockResult)block {
-    [PMLogUtils.sharedInstance info:[NSString stringWithFormat:@"Saving Live Photo with imagePath: %@, videoPath: %@, filename: %@, desc: %@", imagePath, videoPath, title, desc]];
+    [PMLogUtils.sharedInstance info:[NSString stringWithFormat:@"[LivePhoto] Saving Live Photo with imagePath: %@, videoPath: %@, title: %@, desc: %@", imagePath, videoPath, title, desc]];
+
+    // Validate files exist
+    NSFileManager *fm = [NSFileManager defaultManager];
+    BOOL imageExists = [fm fileExistsAtPath:imagePath];
+    BOOL videoExists = [fm fileExistsAtPath:videoPath];
+    [PMLogUtils.sharedInstance info:[NSString stringWithFormat:@"[LivePhoto] Image file exists: %d, video file exists: %d", imageExists, videoExists]];
+
+    if (!imageExists) {
+        NSString *errMsg = [NSString stringWithFormat:@"Image file does not exist at path: %@", imagePath];
+        [PMLogUtils.sharedInstance info:[NSString stringWithFormat:@"[LivePhoto] ERROR: %@", errMsg]];
+        block(nil, [NSError errorWithDomain:@"PMManager" code:-1 userInfo:@{NSLocalizedDescriptionKey: errMsg}]);
+        return;
+    }
+    if (!videoExists) {
+        NSString *errMsg = [NSString stringWithFormat:@"Video file does not exist at path: %@", videoPath];
+        [PMLogUtils.sharedInstance info:[NSString stringWithFormat:@"[LivePhoto] ERROR: %@", errMsg]];
+        block(nil, [NSError errorWithDomain:@"PMManager" code:-1 userInfo:@{NSLocalizedDescriptionKey: errMsg}]);
+        return;
+    }
+
+    NSDictionary *imageAttrs = [fm attributesOfItemAtPath:imagePath error:nil];
+    NSDictionary *videoAttrs = [fm attributesOfItemAtPath:videoPath error:nil];
+    [PMLogUtils.sharedInstance info:[NSString stringWithFormat:@"[LivePhoto] Image size: %@ bytes, Video size: %@ bytes", imageAttrs[NSFileSize], videoAttrs[NSFileSize]]];
+
     NSURL *imageURL = [NSURL fileURLWithPath:imagePath];
     NSURL *videoURL = [NSURL fileURLWithPath:videoPath];
+    [PMLogUtils.sharedInstance info:[NSString stringWithFormat:@"[LivePhoto] imageURL: %@, videoURL: %@", imageURL, videoURL]];
 
     __block NSString *assetId = nil;
     __weak typeof(self) weakSelf = self;
     [[PHPhotoLibrary sharedPhotoLibrary]
      performChanges:^{
+        [PMLogUtils.sharedInstance info:@"[LivePhoto] Inside performChanges block"];
         PHAssetCreationRequest *request = [PHAssetCreationRequest creationRequestForAsset];
         PHAssetResourceCreationOptions *imageOptions = [PHAssetResourceCreationOptions new];
         [imageOptions setOriginalFilename:title];
         [request addResourceWithType:PHAssetResourceTypePhoto fileURL:imageURL options:imageOptions];
+        [PMLogUtils.sharedInstance info:@"[LivePhoto] Added photo resource"];
         PHAssetResourceCreationOptions *videoOptions = [PHAssetResourceCreationOptions new];
         [videoOptions setOriginalFilename:title];
         [request addResourceWithType:PHAssetResourceTypePairedVideo fileURL:videoURL options:videoOptions];
+        [PMLogUtils.sharedInstance info:@"[LivePhoto] Added paired video resource"];
         assetId = request.placeholderForCreatedAsset.localIdentifier;
+        [PMLogUtils.sharedInstance info:[NSString stringWithFormat:@"[LivePhoto] Placeholder assetId: %@", assetId]];
     }
      completionHandler:^(BOOL success, NSError *error) {
         __strong typeof(weakSelf) strongSelf = weakSelf;
         if (!strongSelf) {
+            [PMLogUtils.sharedInstance info:@"[LivePhoto] ERROR: strongSelf is nil in completionHandler"];
             return;
         }
         if (success) {
-            [PMLogUtils.sharedInstance info: [NSString stringWithFormat:@"Created Live Photo asset = %@", assetId]];
-            block([strongSelf getAssetEntity:assetId], nil);
+            [PMLogUtils.sharedInstance info:[NSString stringWithFormat:@"[LivePhoto] SUCCESS: Created Live Photo asset = %@", assetId]];
+            PMAssetEntity *entity = [strongSelf getAssetEntity:assetId];
+            [PMLogUtils.sharedInstance info:[NSString stringWithFormat:@"[LivePhoto] Fetched entity: %@", entity ? @"found" : @"nil"]];
+            block(entity, nil);
         } else {
-            [PMLogUtils.sharedInstance info: [NSString stringWithFormat:@"Create Live Photo asset failed = %@, %@", assetId, error]];
+            [PMLogUtils.sharedInstance info:[NSString stringWithFormat:@"[LivePhoto] FAILED: assetId = %@, error = %@", assetId, error]];
             block(nil, error);
         }
     }];

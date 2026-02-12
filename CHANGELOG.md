@@ -8,7 +8,11 @@ To know more about breaking changes, see the [Migration Guide][].
 
 ## Unreleased
 
-*None.*
+**Features**
+
+- Add `saveMotionPhoto` for Android to save Motion Photo (image + video merged into a single file).
+- Add `saveMotionPhoto` to `AndroidEditor` in the Dart API.
+- Add test entries in the example app for Android Motion Photo saving and iOS Live Photo saving.
 
 ## 3.8.3
 

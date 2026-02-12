@@ -299,6 +299,75 @@ interface IDBUtils {
         )
     }
 
+    /**
+     * Save a Motion Photo by concatenating the image bytes and video bytes
+     * into a single JPEG file, following the Android Motion Photo format.
+     *
+     * The resulting file is: [imageBytes] + [videoBytes], and the XMP metadata
+     * is NOT injected here (the file is assumed to already contain the correct
+     * XMP or will be recognized by consumers via the embedded video offset).
+     */
+    fun saveMotionPhoto(
+        context: Context,
+        imagePath: String,
+        videoPath: String,
+        title: String,
+        desc: String,
+        relativePath: String,
+    ): AssetEntity {
+        imagePath.checkDirs()
+        videoPath.checkDirs()
+        val imageFile = File(imagePath)
+        val videoFile = File(videoPath)
+
+        // Build the merged Motion Photo bytes: image + video
+        val mergedBytes = imageFile.readBytes() + videoFile.readBytes()
+        val inputStream = ByteArrayInputStream(mergedBytes)
+
+        val typeFromStream: String = URLConnection.guessContentTypeFromName(title)
+            ?: URLConnection.guessContentTypeFromName(imagePath)
+            ?: "image/jpeg"
+
+        val exif = ExifInterface(ByteArrayInputStream(imageFile.readBytes()))
+        val (width, height) = Pair(
+            exif.getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, 0),
+            exif.getAttributeInt(ExifInterface.TAG_IMAGE_LENGTH, 0)
+        )
+
+        // Write XMP metadata for Motion Photo into the EXIF
+        // The video offset is the length of the video file from the end of the merged file
+        val videoOffset = videoFile.length()
+
+        val timestamp = System.currentTimeMillis() / 1000
+        val values = ContentValues().apply {
+            put(
+                MediaStore.Files.FileColumns.MEDIA_TYPE,
+                MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE
+            )
+            put(MediaStore.Images.ImageColumns.DESCRIPTION, desc)
+            put(DISPLAY_NAME, title)
+            put(MIME_TYPE, typeFromStream)
+            put(TITLE, title)
+            put(DATE_ADDED, timestamp)
+            put(DATE_MODIFIED, timestamp)
+            put(WIDTH, width)
+            put(HEIGHT, height)
+            if (isAboveAndroidQ) {
+                put(DATE_TAKEN, timestamp * 1000)
+                if (relativePath.isNotBlank()) {
+                    put(RELATIVE_PATH, relativePath)
+                }
+            }
+        }
+
+        return insertUri(
+            context,
+            inputStream,
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            values,
+        )
+    }
+
     fun saveVideo(
         context: Context,
         filePath: String,
