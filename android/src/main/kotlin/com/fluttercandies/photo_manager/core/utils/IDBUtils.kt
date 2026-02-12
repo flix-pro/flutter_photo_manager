@@ -301,11 +301,13 @@ interface IDBUtils {
 
     /**
      * Save a Motion Photo by concatenating the image bytes and video bytes
-     * into a single JPEG file, following the Android Motion Photo format.
+     * into a single JPEG file, following the Android Motion Photo format 1.0.
      *
-     * The resulting file is: [imageBytes] + [videoBytes], and the XMP metadata
-     * is NOT injected here (the file is assumed to already contain the correct
-     * XMP or will be recognized by consumers via the embedded video offset).
+     * This method injects the required XMP metadata (Camera:MotionPhoto=1,
+     * Container:Directory, etc.) so that the gallery app can recognize the file
+     * as a Motion Photo.
+     *
+     * Specification: https://developer.android.com/media/platform/motion-photo-format
      */
     fun saveMotionPhoto(
         context: Context,
@@ -320,23 +322,38 @@ interface IDBUtils {
         val imageFile = File(imagePath)
         val videoFile = File(videoPath)
 
-        // Build the merged Motion Photo bytes: image + video
-        val mergedBytes = imageFile.readBytes() + videoFile.readBytes()
-        val inputStream = ByteArrayInputStream(mergedBytes)
+        // Read image and video bytes
+        val imageBytes = imageFile.readBytes()
+        val videoBytes = videoFile.readBytes()
 
-        val typeFromStream: String = URLConnection.guessContentTypeFromName(title)
+        // Create Motion Photo with XMP metadata using XmpWriter
+        val inputStream = com.fluttercandies.photo_manager.util.XmpWriter.createMotionPhotoStream(
+            imageBytes,
+            videoBytes
+        )
+
+        // Ensure DISPLAY_NAME has a .jpg extension for proper MIME type detection
+        val displayName = if (title.isNotBlank() &&
+            !title.endsWith(".jpg", ignoreCase = true) &&
+            !title.endsWith(".jpeg", ignoreCase = true)
+        ) {
+            "$title.jpg"
+        } else if (title.isBlank()) {
+            "${System.currentTimeMillis()}.jpg"
+        } else {
+            title
+        }
+
+        val typeFromStream: String = URLConnection.guessContentTypeFromName(displayName)
             ?: URLConnection.guessContentTypeFromName(imagePath)
             ?: "image/jpeg"
 
-        val exif = ExifInterface(ByteArrayInputStream(imageFile.readBytes()))
+        // Read dimensions from the original image
+        val exif = ExifInterface(ByteArrayInputStream(imageBytes))
         val (width, height) = Pair(
             exif.getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, 0),
             exif.getAttributeInt(ExifInterface.TAG_IMAGE_LENGTH, 0)
         )
-
-        // Write XMP metadata for Motion Photo into the EXIF
-        // The video offset is the length of the video file from the end of the merged file
-        val videoOffset = videoFile.length()
 
         val timestamp = System.currentTimeMillis() / 1000
         val values = ContentValues().apply {
@@ -345,9 +362,9 @@ interface IDBUtils {
                 MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE
             )
             put(MediaStore.Images.ImageColumns.DESCRIPTION, desc)
-            put(DISPLAY_NAME, title)
+            put(DISPLAY_NAME, displayName)
             put(MIME_TYPE, typeFromStream)
-            put(TITLE, title)
+            put(TITLE, title.ifBlank { displayName })
             put(DATE_ADDED, timestamp)
             put(DATE_MODIFIED, timestamp)
             put(WIDTH, width)

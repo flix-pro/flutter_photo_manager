@@ -14,6 +14,11 @@ To know more about breaking changes, see the [Migration Guide][].
 - Add `saveMotionPhoto` to `AndroidEditor` in the Dart API.
 - Add test entries in the example app for Android Motion Photo saving and iOS Live Photo saving.
 
+**Fixes**
+
+- Fix Motion Photo not being recognized by Android gallery by injecting required XMP metadata (Camera:MotionPhoto, Container:Directory) according to Android Motion Photo format 1.0 specification.
+- Fix Motion Photo not recognized on Xiaomi/MIUI by adding legacy MicroVideo XMP attributes (GCamera:MicroVideo, GCamera:MicroVideoOffset) and ensuring proper `.jpg` file extension.
+
 ## 3.8.3
 
 **Fixes**
